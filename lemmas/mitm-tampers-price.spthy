@@ -1,0 +1,24 @@
+/*
+Description:
+    Lemma checks if the mitm can alter the price anywhere in the transaction, before it reaches the
+    payment processor
+
+Result:
+    Fails -> the mitm is able to set his own transaction amount
+    Holds -> the mitm is not able to define his own transaction amount or does not have acces to the price variable
+*/
+
+// Check_client_tampering() is implemented in utils/tampering.spthy
+lemma mitm_tampers_price:
+    "
+    All merchant_id merchant_defined_amount #i1 . 
+    (
+        Merchant_creates_transaction(merchant_id, merchant_defined_amount) @ #i1
+    )
+
+    ==> not(Ex card_number client_known_amount #i2 . 
+        not(client_known_amount = merchant_defined_amount) &
+        Processor_handles_transaction(card_number, client_known_amount, merchant_id) @ #i2 &
+        not(Ex #i3 merchant_id2 merchant_defined_amount2 . Merchant_creates_transaction(merchant_id2, merchant_defined_amount2) @ #i3 & not(#i3 = #i1)) &
+        not(Ex #i4 any_entity . Check_tampering(any_entity) @ #i4))
+    "

@@ -1,0 +1,28 @@
+/*
+Description:
+    Lemma checks if the client can alter the price of the transaction by comparing the merchant's defined
+    amount with the amount known to the client (presumed altered) and the amount used in the final step of
+    the transaction (performed on the payment processor's server).
+
+Result:
+    Fails -> the client is able to set his own transaction amount
+    Holds -> the client is not able to define his own transaction amount or does not have acces to the price variable
+*/
+
+
+
+
+lemma client_tampers_price:
+    "
+    All merchant_id merchant_defined_amount #i1 . 
+    (
+        Merchant_creates_transaction(merchant_id, merchant_defined_amount) @ #i1
+    )
+
+    ==> not(Ex card_number client_known_amount #i3 . 
+        not(client_known_amount = merchant_defined_amount) &
+        Processor_handles_transaction(card_number, client_known_amount, merchant_id) @ #i3 &
+        not(Ex #i4 merchant_id2 merchant_defined_amount2 . Merchant_creates_transaction(merchant_id2, merchant_defined_amount2) @ #i4 & not(#i4 = #i1)) &
+        not(Ex #i5 . Check_tampering('merchant') @ #i5) &
+        Ex #i6 . Check_tampering('client') @ #i6)
+    "

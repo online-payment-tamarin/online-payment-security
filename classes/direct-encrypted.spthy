@@ -1,0 +1,124 @@
+builtins: asymmetric-encryption
+
+
+// Restrictions
+
+// Considers only traces of the protocol in which signature verification matches
+//restriction Equality:
+//  "All x y #i . Eq(x, y) @ #i ==> x = y"
+
+
+restriction OnlyOnceV:
+  "All #i #j x . OnlyOnceV(x) @ #i & OnlyOnceV (x) @ #j ==> #i = #j"
+
+restriction Inequality:
+  "All x #i. Neq(x,x) @ #i ==> F"
+
+// amount, currency, name not encrypted
+// cryptogram: encrypted <card_number, exp, cvv, public_api_key>
+
+// obs (1): public key is hardcoded (PEM certificate) into the javascript source. the same key is used by all merchants.
+// we can implement as a key request & response (since the javascript file is hosted remotely, it can be altered while on the network)
+
+// Direct Encrypted Model (Cloudpayments.ru)
+// obs: the confirmation webhook (payment processor -> merchant) includes first 6 and last 4 card numbers + exp date
+// -- not included in implementation as it might be cloudpayments.ru specific behaviour
+
+
+rule create_keypair:
+    let
+        public_key = pk(~private_key)        
+    in
+    [Fr(~private_key)]
+    --[OnlyOnceV('unique_keypair')]->
+    [!KeyPair(~private_key, public_key), CP_SendMsg($P, $C, <'payment_processor_pubkey', public_key>), Out(<'payment_processor_pubkey', public_key>)]
+
+rule create_merchant:
+    let
+        merchant_type = 'legit_merchant'
+    in
+    [Fr(~api_key), !KeyPair(private_key, public_key)]
+    --[OnlyOnceV(merchant_type), Create_merchant(~api_key)]->
+    [!Merchant($M, ~api_key, public_key, merchant_type), CM_SendMsg($M, $C, <'merchant_api_key', ~api_key>)] // see (1)
+
+rule create_adversary_merchant:
+    let
+        merchant_type = 'adversary_merchant'
+    in
+    [Fr(~api_key), !KeyPair(private_key, public_key), !Merchant(M, m_api_key, m_public_key, 'legit_merchant')]
+    --[Neq($AM, M), OnlyOnceV(merchant_type), Create_adversary_merchant(~api_key)]->
+    [!Merchant($AM, ~api_key, public_key, merchant_type), Out(<'adversary_api_key', ~api_key>)] 
+
+rule create_client:
+    [Fr(~card_number), CP_RecvMsg($P, $C, <'payment_processor_pubkey', recv_public_key>), !Merchant(M, api_key, public_key, 'legit_merchant'), !Merchant(AM, am_api_key, am_public_key, 'adversary_merchant')]
+    --[Neq($C, M), Neq($C, AM), OnlyOnceV('legit_client'), Create_client(~card_number)]->
+    [!Client($C, ~card_number, api_key, recv_public_key)]
+
+rule client_sends_card_details:
+    let
+        data = <card_number, api_key>
+        encrypted_data = aenc(data, public_key)
+    in
+    [!Client($C, card_number, api_key, public_key)]
+    --[Client_sends_card_details(card_number)]->
+    [CM_SendMsg($C, $M, <'client_card_details', encrypted_data>)]
+
+rule merchant_creates_transaction:
+    [CM_RecvMsg($C, M, <'client_card_details', recv_encrypted_data>), Fr(~amount), Fr(~merchant_ref), !Merchant(M, api_key, public_key, merchant_type)]
+    --[Merchant_creates_transaction(api_key, ~amount)]->
+    [MP_SendMsg(M, $P, <'merchant_transaction_data', recv_encrypted_data, ~amount, ~merchant_ref>), Memory( M, <'client_card_details', recv_encrypted_data>)]
+
+rule processor_handles_transaction:
+    let
+        recv_data = adec(recv_encrypted_data, private_key)
+        recv_card_number = fst(recv_data)
+        recv_api_key = snd(recv_data)
+        payment_processor_confirmation = 'payment_processor_confirmation'
+    in
+    [MP_RecvMsg(M, $P, <'merchant_transaction_data', recv_encrypted_data, recv_amount, recv_merchant_ref>), !KeyPair(private_key, public_key), !Client($C, recv_card_number, api_key, recv_public_key), !Merchant(M, recv_api_key, public_key, merchant_type)]
+    --[
+        Processor_handles_transaction(recv_card_number, recv_amount, recv_api_key)
+    ]->
+    [!Transaction_approved(), MP_SendMsg($P, M, <'payment_processor_confirmation', payment_processor_confirmation>)] // this happens only when Eq holds or the restriction is not defined
+
+rule merchant_receives_confirmation:
+    let
+        merchant_confirmation = 'merchant_confirmation'
+    in
+    [MP_RecvMsg($P, M, <'payment_processor_confirmation', recv_payment_processor_confirmation>)]
+    -->
+    [CM_SendMsg(M, $C, <'merchant_confirmation', merchant_confirmation>), !Merchant_received_confirmation()]
+
+rule client_receives_confirmation:
+    [CM_RecvMsg(M, $C, <'merchant_confirmation', merchant_confirmation>)]
+    -->
+    [!Client_received_confirmation()]
+
+rule check_transaction_status:
+    [!Transaction_approved()]
+    --[Check_transaction_approved()]->
+    []
+
+
+
+// Instrumentation
+
+rule check_merchant_received_confirmation:
+    [!Merchant_received_confirmation()]
+    --[Check_merchant_received_confirmation()]->
+    []
+
+rule check_client_received_confirmation:
+    [!Client_received_confirmation()]
+    --[Check_client_received_confirmation()]->
+    []
+
+rule check_transaction_status:
+    [!Transaction_approved()]
+    --[Check_transaction_approved()]->
+    []
+
+rule check_client_knows_amount:
+    [!Client_knows_amount(amount)]
+    --[Check_client_knows_amount(amount)]->
+    []

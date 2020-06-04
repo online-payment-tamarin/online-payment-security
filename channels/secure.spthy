@@ -1,0 +1,15 @@
+rule ChanOut_S:
+    [SendMsg(A, B, x)]
+    --[]->
+    [Sec(A, B, x)]
+
+rule ChanIn_S:
+    [Sec(A, B, x)]
+    --[]->
+    [RecvMsg(A, B, x)]
+
+
+
+
+
+

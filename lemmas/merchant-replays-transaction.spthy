@@ -1,0 +1,22 @@
+/*
+Description:
+    The objective is to check if a merchant can create 2 transactions when the client submits the 
+    banking information only once.
+
+Result:
+    Fails -> a merchant can charge the client twice
+    Holds -> only one transaction is allowed
+*/
+lemma merchant_replays_transaction:
+    "
+    All card_number recv_amount public_api_key #i1 #i2. 
+    (
+        Client_sends_card_details(card_number) @ #i1 &
+        Processor_handles_transaction(card_number, recv_amount, public_api_key) @ #i2
+    )
+
+    ==> not(Ex #i3 recv_amount2. 
+            not(#i3 = #i2) &
+            Processor_handles_transaction(card_number, recv_amount2, public_api_key) @ #i3 &
+            not(Ex #i4 . not(#i4 = #i1) & Client_sends_card_details(card_number) @ #i4)) 
+    "

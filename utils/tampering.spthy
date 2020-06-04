@@ -1,0 +1,33 @@
+/*
+    Making a client (or merchant) entity 'think of' forging a variable is difficult. Tamarin implements only a network-level
+    adversary so the client & merchant are considered to always behave as intended. A malicious client/merchant, in a secure-channel
+    context requires reimplementing Tamarin's network adversary or employing it by leaking certain variables and using the value returned
+    by the adversary.
+    
+    The second option was chosen -> in the protocol SendMsgTampered($S, $D, m) must be added wherever a 'trusted'
+    entity forwards information.
+
+    E.g.:
+
+    We simulate that a client receives a transaction from a merchant and wants to lower the price before forwarding it to the payment processor.
+    The client leaks the transaction amount to the network adversary (Out(..)) and waits for a response (In(..)). The network adversary observes
+    the lemma which says that the price must differ so returns a different value (presumably lower). The client receives the value
+    and puts it back in the secure channel by forwarding it to the payment processor, so it looks like the client changed the value.
+
+*/
+
+
+rule tamper_leak:
+    [SendMsgTampered(entity, S, D, m)]
+    --[OnlyOnceV(<entity, 'lk'>)]-> 
+    [Out(m), Tampered(entity, S, D)]
+
+rule tamper_send_to_processor:
+    [In(m2), Tampered(entity, S, P), !Processor(P)]
+    --[OnlyOnceV(<entity, 'snd'>), Check_tampering(entity)]->  // without OnlyOnceV(entity), the prover gets stuck in a loop when proving lemma merchant-replays-transaction; dunno why atm.
+    [CP_SendMsg(S, P, m2)]
+
+rule tamper_send_to_merchant:
+    [In(m2), Tampered(entity, S, D), !Processor(P)]
+    --[Neq(D, P), OnlyOnceV(<entity, 'snd'>), Check_tampering(entity)]->  // without OnlyOnceV(entity), the prover gets stuck in a loop when proving lemma merchant-replays-transaction; dunno why atm.
+    [CM_SendMsg(S, D, m2)]

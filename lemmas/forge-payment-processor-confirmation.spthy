@@ -1,0 +1,20 @@
+/*
+Description:
+    This lemma checks if a Check_merchant_received_confirmation() can happen without an 
+    Check_transaction_approved() - in other words, if the merchant can receive a 
+    confirmation of a successful transaction without the transaction happening
+
+Result:
+    Fails -> payment processor's confirmations can be forged and sent by an adversary
+    Holds -> payment processor's confirmations can't be forged
+*/
+lemma forge_payment_processor_confirmation:
+    "
+    All card_number #i1 #i2 . 
+    (
+        Create_client(card_number) @ #i1 &
+        Check_merchant_received_confirmation() @ #i2
+    )
+
+    ==> Ex card_number recv_amount public_api_key #i3 . Processor_handles_transaction(card_number, recv_amount, public_api_key) @ #i3
+    "

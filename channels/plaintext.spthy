@@ -1,0 +1,9 @@
+rule ChanOut_P:
+    [SendMsgVuln(A, B, x)]
+    --[]->
+    [Out(<A, B, x>)]
+
+rule ChanIn_P:
+    [In(<A, B, x>)]
+    --[]->
+    [RecvMsgVuln(A, B, x)]

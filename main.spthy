@@ -1,0 +1,48 @@
+theory proto_main_module
+
+begin
+
+builtins: signing
+
+
+
+
+//define(`hosted-signature-based', 1)
+//  # define(`compromise-merchant-processor', 1)
+//  define(`compromise-client-merchant', 1)
+//  # define(`compromise-client-processor', 1)
+
+// # --- Channels Implementations Below
+include(channels/secure.spthy)
+include(channels/plaintext.spthy)
+include(channels/config.spthy)
+
+
+// # --- Utils
+include(utils/tampering.spthy)
+include(utils/memory.spthy)
+
+
+// # --- Classes Implementations Below
+ifdef(`direct-signature-based',`include(classes/direct-signature-based.spthy)',)
+ifdef(`direct-encrypted',`include(classes/direct-encrypted.spthy)',)
+ifdef(`direct-simple',`include(classes/direct-simple.spthy)',)
+ifdef(`hosted-simple',`include(classes/hosted-simple.spthy)',)
+ifdef(`hosted-token-based',`include(classes/hosted-token-based.spthy)',)
+ifdef(`hosted-signature-based',`include(classes/hosted-signature-based.spthy)',)
+ifdef(`hosted-token-based-2',`include(classes/hosted-token-based-2.spthy)',)
+ifdef(`hosted-token-based-encrypted',`include(classes/hosted-token-based-encrypted.spthy)',)
+
+
+// # --- Generic Lemmas Below
+include(lemmas/sanity-check.spthy)
+include(lemmas/intercept-card-data.spthy)
+include(lemmas/forge-payment-processor-confirmation.spthy)
+include(lemmas/validate-shown-price.spthy)
+include(lemmas/hijack-transaction.spthy)
+include(lemmas/forge-merchant-confirmation.spthy)
+include(lemmas/client-tampers-price.spthy)
+include(lemmas/merchant-replays-transaction.spthy)
+include(lemmas/mitm-tampers-price.spthy)
+include(lemmas/merchant-tampers-price.spthy)
+end

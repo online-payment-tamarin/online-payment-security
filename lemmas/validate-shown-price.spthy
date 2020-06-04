@@ -1,0 +1,20 @@
+/*
+Description:
+    Lemma checks if the transaction amount ever reaches the client (so the client is informed).
+    If it does, then the transaction amount must be the same as the one in Processor_handles_transaction(), otherwise
+    it means that the client might be charged a different amount than indicated
+
+Result:
+    Fails -> it is formally guaranteed that the amount received by the client is also the one in the transaction
+    Holds -> there is no guarantee that the amount shown to the client is the one used in the final transaction
+*/
+lemma validate_shown_price:
+    "
+    All card_number transaction_amount #i1 #i2 . 
+    (
+        Client_sends_card_details(card_number) @ #i1 &
+        Check_client_knows_amount(transaction_amount) @ #i2
+    )
+
+    ==> not(Ex merchant_id #i3 . Processor_handles_transaction(card_number, transaction_amount, merchant_id) @ #i3)
+    "

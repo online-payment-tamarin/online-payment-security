@@ -1,0 +1,11 @@
+/*
+    This is used to simulate the fact that a merchant can memorize received variables, for further replay attacks.
+    It works by making the merchant sending himself the same message
+*/
+
+
+rule merchant_remember_information:
+    [Memory(M, msg)]
+    --[OnlyOnceV('one_replay')]->
+    [SendMsg($ANY, M, msg)]
+

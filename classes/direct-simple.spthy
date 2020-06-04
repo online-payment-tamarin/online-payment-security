@@ -1,0 +1,108 @@
+builtins: asymmetric-encryption
+
+
+// Restrictions
+
+// Considers only traces of the protocol in which signature verification matches
+//restriction Equality:
+//  "All x y #i . Eq(x, y) @ #i ==> x = y"
+
+
+restriction OnlyOnceV:
+  "All #i #j x . OnlyOnceV(x) @ #i & OnlyOnceV (x) @ #j ==> #i = #j"
+
+restriction Inequality:
+  "All x #i. Neq(x,x) @ #i ==> F"
+
+// Direct Simple Model (Authorize.net)
+// transaction key = secret
+// name = public merchant identifier
+
+
+rule create_processor:
+    []
+    --[OnlyOnceV('unique_payment_processor')]->
+    [!Processor($P)]
+
+rule create_merchant:
+    let
+        merchant_type = 'legit_merchant'
+    in
+    [Fr(~name), Fr(~transaction_key), !Processor(P)]
+    --[Neq($M, P), OnlyOnceV(merchant_type), Create_merchant(~name)]->
+    [!Merchant($M, ~name, ~transaction_key, merchant_type)] 
+
+rule create_adversary_merchant:
+    let
+        merchant_type = 'adversary_merchant'
+    in
+    [Fr(~name), Fr(~transaction_key), !Merchant(M, m_name, m_transaction_key, 'legit_merchant'), !Processor(P)]
+    --[Neq($AM, P), Neq($AM, M), OnlyOnceV(merchant_type), Create_adversary_merchant(~name)]->
+    [!Merchant($AM, ~name, ~transaction_key, merchant_type), Out(~name)] 
+
+rule create_client:
+    [Fr(~card_number), !Merchant(M, m_name, m_transaction_key, 'legit_merchant'), !Merchant(AM, am_name, am_transaction_key, 'adversary_merchant'), !Processor(P)]
+    --[Neq($C, P), Neq($C, M), Neq($C, AM), OnlyOnceV('legit_client'), Create_client(~card_number)]->
+    [!Client($C, ~card_number)]
+
+rule client_sends_card_details:
+    [!Client(C, card_number), !Merchant(M, m_name, m_transaction_key, 'legit_merchant')] // we don't want the client to 'cooperate' send banking information directly to the adversary
+    --[Client_sends_card_details(card_number)]->
+    [CM_SendMsg(C, M, <'client_card_details', card_number>)]
+
+rule merchant_creates_transaction:
+    [CM_RecvMsg(C, M, <'client_card_details', recv_card_number>), Fr(~amount), Fr(~merchant_ref), !Merchant(M, name, transaction_key, merchant_type), !Processor(P)]
+    --[Merchant_creates_transaction(name, ~amount)]->
+    [MP_SendMsg(M, P, <'merchant_transaction_data', recv_card_number, ~amount, ~merchant_ref, name, transaction_key>), Memory(M, <'client_card_details', recv_card_number>)]
+
+rule processor_handles_transaction:
+    let
+        payment_processor_confirmation = 'payment_processor_confirmation'    
+    in
+    [MP_RecvMsg(M, P, <'merchant_transaction_data', recv_card_number, recv_amount, recv_merchant_ref, recv_name, recv_transaction_key>), !Client($C, recv_card_number), !Merchant(M, recv_name, recv_transaction_key, merchant_type)]
+    --[
+        Processor_handles_transaction(recv_card_number, recv_amount, recv_name)
+    ]->
+    [!Transaction_approved(), MP_SendMsg(P, M, <'payment_processor_confirmation', payment_processor_confirmation>)] // this happens only when Eq holds or the restriction is not defined
+
+rule merchant_receives_confirmation:
+    let
+        merchant_confirmation = 'merchant_confirmation'
+    in
+    [MP_RecvMsg(P, M, <'payment_processor_confirmation', recv_payment_processor_confirmation>), !Client(C, c_card_number)]
+    -->
+    [CM_SendMsg(M, C, <'merchant_confirmation', merchant_confirmation>), !Merchant_received_confirmation()]
+
+rule client_receives_confirmation:
+    [CM_RecvMsg(M, C, <'merchant_confirmation', merchant_confirmation>)]
+    -->
+    [!Client_received_confirmation()]
+
+rule check_transaction_status:
+    [!Transaction_approved()]
+    --[Check_transaction_approved()]->
+    []
+
+
+
+// Instrumentation
+
+rule check_merchant_received_confirmation:
+    [!Merchant_received_confirmation()]
+    --[Check_merchant_received_confirmation()]->
+    []
+
+rule check_client_received_confirmation:
+    [!Client_received_confirmation()]
+    --[Check_client_received_confirmation()]->
+    []
+
+rule check_transaction_status:
+    [!Transaction_approved()]
+    --[Check_transaction_approved()]->
+    []
+
+rule check_client_knows_amount:
+    [!Client_knows_amount(amount)]
+    --[Check_client_knows_amount(amount)]->
+    []

@@ -1,0 +1,25 @@
+/*
+Description:
+    This lemma attempts to perform a transaction using the adversary's merchant id.
+    In theory, it should work against most protocols because the prover relies on
+    intercepting the card details of the client (or even the cryptogram) and forwarding 
+    everything to the malicious merchant which can create transactions as he wishes.
+
+    When card details are not accessible, the merchant id is altered to match the
+    adversary's.
+
+Result:
+    Fails -> transactions can be hijacked
+    Holds -> transactions can NOT be hijacked
+*/
+lemma hijack_transaction:
+    "
+    All card_number legit_merchant_id adversary_merchant_id #i1 #i2 #i3 . 
+    (
+        Create_merchant(legit_merchant_id) @ #i1 &
+        Create_adversary_merchant(adversary_merchant_id) @ #i2 & 
+        Client_sends_card_details(card_number) @ #i3
+    )
+
+    ==> not(Ex transaction_amount #i4 . Processor_handles_transaction(card_number, transaction_amount, adversary_merchant_id) @ #i4)
+    "

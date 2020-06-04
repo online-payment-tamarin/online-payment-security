@@ -1,0 +1,19 @@
+/*
+Description:
+    This lemma attempts to discover if, at any point, the card details of the client can be intercepted,
+    in unencrypted form, by an adversary with network access (MitM). It makes the assumtption that
+    there does not exist a timestamp #i2 at which the adversary (K) learns the card_number
+
+Result:
+    Fails -> the confidentiality of the card_number can not be guaranteed
+    Holds -> the man in the middle can't intercept sensitive card information 
+*/
+lemma intercept_client_card_information:
+    "
+    All card_number #i1.
+    (
+        Create_client(card_number) @ #i1
+    )
+    
+    ==> not(Ex #i2 . K(card_number) @ #i2)
+    "

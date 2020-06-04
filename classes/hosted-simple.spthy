@@ -1,0 +1,124 @@
+
+
+// Restrictions
+
+// Considers only traces of the protocol in which signature verification matches
+//restriction Equality:
+ // "All x y #i . Eq(x, y) @ #i ==> x = y"
+
+
+restriction OnlyOnceV:
+  "All #i #j x . OnlyOnceV(x) @ #i & OnlyOnceV (x) @ #j ==> #i = #j"
+
+restriction Inequality:
+  "All x #i. Neq(x,x) @ #i ==> F"
+
+
+// Hosted Simple (Datatrans' model)
+
+rule create_processor:
+    []
+    --[OnlyOnceV('unique_payment_processor')]->
+    [!Processor($P)]
+
+rule create_merchant:
+    let
+        merchant_type = 'legit_merchant'
+    in
+    [Fr(~merchant_id), !Processor(P)]
+    --[Neq($M, P), OnlyOnceV(merchant_type), Create_merchant(~merchant_id)]->
+    [!Merchant($M, ~merchant_id, merchant_type)]
+
+rule create_adversary_merchant:
+    let
+        merchant_type = 'adversary_merchant'
+    in
+    [Fr(~merchant_id), !Merchant(M, m_merchant_id, 'legit_merchant'), !Processor(P)]
+    --[Neq($AM, P), Neq($AM, M), OnlyOnceV(merchant_type), Create_adversary_merchant(~merchant_id)]->
+    [!Merchant($AM, ~merchant_id, merchant_type)]
+
+rule create_client:
+    [Fr(~card_number), !Merchant(M, merchant_id, 'legit_merchant'), !Merchant(AM, am_merchant_id, 'adversary_merchant'), !Processor(P)]
+    --[Neq($C, P), Neq($C, M), Neq($C, AM), OnlyOnceV('legit_client'), Create_client(~card_number)]->
+    [!Client($C, ~card_number, merchant_id)]
+
+
+rule client_creates_request:
+    [!Client(C, card_number, merchant_id), !Merchant(M, merchant_id, 'legit_merchant')]
+    -->
+    [CM_SendMsg(C, M, <'client_transaction_request'>)]
+
+rule merchant_creates_transaction:
+    [CM_RecvMsg(C, M, <'client_transaction_request'>), !Merchant(M, merchant_id, merchant_type), Fr(~amount), Fr(~merchant_ref)]
+    --[Merchant_creates_transaction(merchant_id, ~amount)]->
+    [CM_SendMsg(M, C, <'merchant_transaction_data', merchant_id, ~amount, ~merchant_ref>)]
+
+
+rule client_forwards_transaction:
+    [CM_RecvMsg(M, C, <'merchant_transaction_data', recv_merchant_id, recv_amount, recv_merchant_ref>), !Client(C, card_number, merchant_id), !Processor(P)]
+    --[Client_forwards_transaction()]->
+    [SendMsgTampered('client', C, P, <'merchant_transaction_data2', recv_merchant_id, recv_amount, recv_merchant_ref>), CP_SendMsg(C, P, <'merchant_transaction_data2', recv_merchant_id, recv_amount, recv_merchant_ref>), !Client_knows_amount(recv_amount)]
+
+rule payment_processor_returns_transaction_id:
+    [CP_RecvMsg(C, P, <'merchant_transaction_data2', recv_merchant_id, recv_amount, recv_merchant_ref>), !Merchant(M, recv_merchant_id, merchant_type), Fr(~transaction_id)]
+    -->
+    [CP_SendMsg(P, C, <'transaction_id', ~transaction_id>), TransactionExists(~transaction_id, recv_merchant_id, recv_amount)]
+
+rule client_sends_card_details:
+    [CP_RecvMsg(P, C, <'transaction_id', recv_transaction_id>), !Client(C, card_number, merchant_id)]
+    --[Client_sends_card_details(card_number)]->
+    [CP_SendMsg(C, P, <'client_card_details', recv_transaction_id, card_number>)]
+
+rule payment_processor_performs_transaction:
+    let
+        payment_processor_confirmation = 'payment_processor_confirmation'    
+    in
+    [CP_RecvMsg(C, P, <'client_card_details', recv_transaction_id, recv_card_number>), !Client(C, recv_card_number, merchant_id), TransactionExists(recv_transaction_id, recv_merchant_id, recv_amount), !Merchant(M, recv_merchant_id, merchant_type), !Processor(P)]
+    --[Processor_handles_transaction(recv_card_number, recv_amount, recv_merchant_id)]->
+    [!Transaction_approved(), MP_SendMsg(P, M, <'payment_processor_confirmation', payment_processor_confirmation>)]
+
+rule merchant_receives_confirmation:
+    let
+        merchant_confirmation = 'merchant_confirmation'
+    in
+    [MP_RecvMsg(P, M, <'payment_processor_confirmation', recv_payment_processor_confirmation>), !Client(C, c_card_number, c_merchant_id),  !Merchant(M, m_merchant_id, m_merchant_type)]
+    -->
+    [CM_SendMsg(M, C, <'merchant_confirmation', merchant_confirmation>), !Merchant_received_confirmation()]
+
+rule client_receives_confirmation:
+    [CM_RecvMsg(M, C, <'merchant_confirmation', merchant_confirmation>)]
+    -->
+    [!Client_received_confirmation()]
+
+
+
+// Instrumentation
+
+rule check_merchant_received_confirmation:
+    [!Merchant_received_confirmation()]
+    --[Check_merchant_received_confirmation()]->
+    []
+
+rule check_client_received_confirmation:
+    [!Client_received_confirmation()]
+    --[Check_client_received_confirmation()]->
+    []
+
+rule check_transaction_status:
+    [!Transaction_approved()]
+    --[Check_transaction_approved()]->
+    []
+
+rule check_client_knows_amount:
+    [!Client_knows_amount(amount)]
+    --[Check_client_knows_amount(amount)]->
+    []
+
+
+
+
+
+
+
+
+  

@@ -1,0 +1,17 @@
+define(`CM_SendMsg', `SendMsg($*)')
+define(`CM_RecvMsg', `RecvMsg($*)')
+
+define(`MP_SendMsg', `SendMsg($*)')
+define(`MP_RecvMsg', `RecvMsg($*)')
+
+define(`CP_SendMsg', `SendMsg($*)')
+define(`CP_RecvMsg', `RecvMsg($*)')
+
+ifdef(`compromise-client-merchant', `define(`CM_SendMsg', `SendMsgVuln($*)')')
+ifdef(`compromise-client-merchant', `define(`CM_RecvMsg', `RecvMsgVuln($*)')')
+
+ifdef(`compromise-merchant-processor', `define(`MP_SendMsg', `SendMsgVuln($*)')')
+ifdef(`compromise-merchant-processor', `define(`MP_RecvMsg', `RecvMsgVuln($*)')')
+
+ifdef(`compromise-client-processor', `define(`CP_SendMsg', `SendMsgVuln($*)')')
+ifdef(`compromise-client-processor', `define(`CP_RecvMsg', `RecvMsgVuln($*)')')

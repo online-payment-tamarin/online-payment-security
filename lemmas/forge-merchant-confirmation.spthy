@@ -1,0 +1,19 @@
+/*
+Description:
+    This lemma checks if a Check_transaction_approved() can happen without an 
+    Check_client_received_confirmation() - in other words, a transaction happens
+    and the client is not informed properly
+
+Result:
+    Fails -> payment confirmations can be forged (i.e.: the client can be tricked into paying twice, by invoking a system error)
+    Holds -> payment confirmations can't be forged
+*/
+lemma forge_merchant_confirmation:
+    "
+    All card_number #i1 . 
+    (
+        Create_client(card_number) @ #i1
+    )
+
+    ==> not(Ex #i2 . Check_transaction_approved() @ #i2 & not(Ex #i3 . Check_client_received_confirmation() @ #i3))
+    "

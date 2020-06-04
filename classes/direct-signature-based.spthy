@@ -1,0 +1,105 @@
+builtins: signing
+
+
+// Restrictions
+
+// Considers only traces of the protocol in which signature verification matches
+restriction Equality:
+  "All x y #i . Eq(x, y) @ #i ==> x = y"
+
+restriction OnlyOnceV:
+  "All #i #j x . OnlyOnceV(x) @ #i & OnlyOnceV (x) @ #j ==> #i = #j"
+
+restriction Inequality:
+  "All x #i. Neq(x,x) @ #i ==> F"
+
+// Direct Signature Based (Payeezy's model)
+
+rule create_merchant:
+    let
+        merchant_type = 'legit_merchant'
+    in
+    [Fr(~api_key), Fr(~token), Fr(~api_secret), Fr(~price)]
+    --[OnlyOnceV(merchant_type), Create_merchant(~token)]->
+    [!Merchant($M, ~api_key, ~token, ~api_secret, merchant_type)]
+
+rule create_adversary_merchant:
+    let
+        merchant_type = 'adversary_merchant'
+    in
+    [Fr(~api_key), Fr(~token), Fr(~api_secret), Fr(~price), !Merchant(M, m_api_key, m_token, m_api_secret, 'legit_merchant')]
+    --[Neq($AM, M), OnlyOnceV(merchant_type), Create_adversary_merchant(~token)]->
+    [!Merchant($AM, ~api_key, ~token, ~api_secret, merchant_type)]
+
+rule create_client:
+    [Fr(~card_number), !Merchant(M, m_api_key, m_token, m_api_secret, 'legit_merchant'), !Merchant(AM, am_api_key, am_token, am_api_secret, 'adversary_merchant')]
+    --[Neq($C, M), Neq($C, AM), OnlyOnceV('legit_client'), Create_client(~card_number)]->
+    [!Client($C, ~card_number)]
+
+rule client_sends_card_details:
+    [!Client($C, card_number), !Merchant(M, m_api_key, m_token, m_api_secret, 'legit_merchant')]
+    --[Client_sends_card_details(card_number)]->
+    [CM_SendMsg($C, M, <'client_card_details', card_number>)]
+
+
+rule merchant_creates_transaction:
+	let
+        payload = <api_key, ~nonce, ~timestamp, token, card_number, ~amount, ~merchant_ref>
+        payload_signature = sign(payload, ~api_secret)
+    in
+    [CM_RecvMsg($C, M, <'client_card_details', card_number>), !Merchant(M, api_key, token, ~api_secret, merchant_type), Fr(~nonce), Fr(~timestamp), Fr(~amount), Fr(~merchant_ref)]
+    --[Merchant_creates_transaction(token, ~amount)]->
+    [MP_SendMsg(M, $P, <'merchant_transaction_data', payload, payload_signature, api_key, token>), Memory(M, <'client_card_details', card_number>)] //
+
+
+
+rule processor_handles_transaction:
+    let
+        recv_card_number = fst(snd(snd(snd(snd(recv_payload)))))
+        recv_amount = fst(snd(snd(snd(snd(snd(recv_payload))))))
+        payment_processor_confirmation = 'payment_processor_confirmation'
+    in
+    [MP_RecvMsg(M, $P, <'merchant_transaction_data', recv_payload, recv_payload_signature, recv_api_key, recv_token>), !Merchant(M, recv_api_key, recv_token, api_secret, merchant_type), !Client($C, recv_card_number)]
+    --[
+        Eq(verify(recv_payload_signature, recv_payload, pk(api_secret)), true),
+        Processor_handles_transaction(recv_card_number, recv_amount, recv_token)
+    ]->
+    [!Transaction_approved(), MP_SendMsg($P, M, <'payment_processor_confirmation', payment_processor_confirmation>)] // this happens only when Eq holds or the restriction is not defined
+
+rule merchant_receives_confirmation:
+    let
+        merchant_confirmation = 'merchant_confirmation'
+    in
+    [MP_RecvMsg($P, M, <'payment_processor_confirmation', recv_payment_processor_confirmation>)]
+    -->
+    [CM_SendMsg(M, $C, <'merchant_confirmation', merchant_confirmation>), !Merchant_received_confirmation()]
+
+rule client_receives_confirmation:
+    [CM_RecvMsg(M, $C, <'merchant_confirmation', merchant_confirmation>)]
+    -->
+    [!Client_received_confirmation()]
+
+
+// Instrumentation
+
+rule check_merchant_received_confirmation:
+    [!Merchant_received_confirmation()]
+    --[Check_merchant_received_confirmation()]->
+    []
+
+rule check_client_received_confirmation:
+    [!Client_received_confirmation()]
+    --[Check_client_received_confirmation()]->
+    []
+
+rule check_transaction_status:
+    [!Transaction_approved()]
+    --[Check_transaction_approved()]->
+    []
+
+rule check_client_knows_amount:
+    [!Client_knows_amount(amount)]
+    --[Check_client_knows_amount(amount)]->
+    []
+
+  

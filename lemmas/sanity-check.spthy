@@ -1,0 +1,18 @@
+/*
+Description:
+    Lemma aims to validate the functionality of the model by presuming that there is no way a transaction is approved (completed).
+    If there exists a timestamp at which Check_transaction_approved() happens, then there exists a method of completing a transaction.
+
+Result:
+    Fails -> there is a way to complete transactions using the given model
+    Holds -> there is no way to reach the final state of the protocol -> possible implementation error
+*/
+lemma sanity_check:
+    "
+    All card_number #i1 . 
+    (
+        Create_client(card_number) @ #i1
+    )
+
+    ==> not(Ex #i2 amount merchant_id . Processor_handles_transaction(card_number, amount, merchant_id) @ #i2)
+    "
