@@ -24,14 +24,14 @@ include(utils/memory.spthy)
 
 
 // # --- Classes Implementations Below
-ifdef(`direct-signature-based',`include(classes/direct-signature-based.spthy)',)
-ifdef(`direct-encrypted',`include(classes/direct-encrypted.spthy)',)
-ifdef(`direct-simple',`include(classes/direct-simple.spthy)',)
-ifdef(`hosted-simple',`include(classes/hosted-simple.spthy)',)
-ifdef(`hosted-token-based',`include(classes/hosted-token-based.spthy)',)
-ifdef(`hosted-signature-based',`include(classes/hosted-signature-based.spthy)',)
-ifdef(`hosted-token-based-2',`include(classes/hosted-token-based-2.spthy)',)
-ifdef(`hosted-token-based-encrypted',`include(classes/hosted-token-based-encrypted.spthy)',)
+ifdef(`direct:signature',`include(classes/direct:signature.spthy)',)
+ifdef(`direct:encrypted',`include(classes/direct:encrypted.spthy)',)
+ifdef(`direct:simple',`include(classes/direct:simple.spthy)',)
+ifdef(`delegated:simple',`include(classes/delegated:simple.spthy)',)
+ifdef(`delegated:ctoken',`include(classes/delegated:ctoken.spthy)',)
+ifdef(`delegated:signature',`include(classes/delegated:signature.spthy)',)
+ifdef(`delegated:mtoken',`include(classes/delegated:mtoken.spthy)',)
+ifdef(`delegated:ctoken:encrypted',`include(classes/delegated:ctoken:encrypted.spthy)',)
 
 
 // # --- Generic Lemmas Below
