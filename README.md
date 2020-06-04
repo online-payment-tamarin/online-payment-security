@@ -1,4 +1,6 @@
-# Security Assessment of Mobile Payment Systems
+# Modeling the Security of Online Payment Protocols
+
+This is the support source code for the `Modeling the Security of Online Payment Protocols` anonymous submission to IEEE S&P 2021.
 
 ### Prerequisites
 
